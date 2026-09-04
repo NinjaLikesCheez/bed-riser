@@ -3,54 +3,65 @@
 // ----- Parameters -----
 baseW = 200mm   // base width (short axis)
 baseL = 400mm   // base length (elongated axis)
-topW = 90mm     // top width (short axis)
-topL = 180mm    // top length (elongated axis)
+socketW = 90mm  // socket opening width (short axis) - must fit the 9cm bed leg
+socketL = 180mm // socket opening length (elongated axis) - must fit the 18cm bed leg
 height = 150mm  // riser height
 
-notchW = 30mm     // width of the cross notch that grips the bed leg
-notchDepth = 20mm // how deep the notch cuts down from the top face
+notchDepth = 20mm     // how deep the socket cuts down from the top face
+wallThickness = 15mm  // thickness of the solid rim standing around the socket
+
+// Top face is sized to the socket plus the wall on all sides, so the socket
+// opening itself always stays exactly socketW x socketL.
+topW = socketW + 2 * wallThickness // top width (short axis)
+topL = socketL + 2 * wallThickness // top length (elongated axis)
 
 // ----- Base profile (on XY, centered at origin) -----
-baseProfile = startSketchOn(XY)
-  |> startProfile(at = [-baseL / 2, -baseW / 2])
-  |> line(endAbsolute = [baseL / 2, -baseW / 2])
-  |> line(endAbsolute = [baseL / 2, baseW / 2])
-  |> line(endAbsolute = [-baseL / 2, baseW / 2])
-  |> close()
+base = sketch(on = XY) {
+  line1 = line(start = [-baseL / 2, -baseW / 2], end = [baseL / 2, -baseW / 2])
+  line2 = line(start = [baseL / 2, -baseW / 2], end = [baseL / 2, baseW / 2])
+  line3 = line(start = [baseL / 2, baseW / 2], end = [-baseL / 2, baseW / 2])
+  line4 = line(start = [-baseL / 2, baseW / 2], end = [-baseL / 2, -baseW / 2])
+
+  coincident([line1.end, line2.start])
+  coincident([line2.end, line3.start])
+  coincident([line3.end, line4.start])
+  coincident([line4.end, line1.start])
+}
 
 // ----- Top profile (on a plane at `height`, centered at origin) -----
 topPlane = offsetPlane(XY, offset = height)
 
-topProfile = startSketchOn(topPlane)
-  |> startProfile(at = [-topL / 2, -topW / 2])
-  |> line(endAbsolute = [topL / 2, -topW / 2])
-  |> line(endAbsolute = [topL / 2, topW / 2])
-  |> line(endAbsolute = [-topL / 2, topW / 2])
-  |> close()
+top = sketch(on = topPlane) {
+  line1 = line(start = [-topL / 2, -topW / 2], end = [topL / 2, -topW / 2])
+  line2 = line(start = [topL / 2, -topW / 2], end = [topL / 2, topW / 2])
+  line3 = line(start = [topL / 2, topW / 2], end = [-topL / 2, topW / 2])
+  line4 = line(start = [-topL / 2, topW / 2], end = [-topL / 2, -topW / 2])
+
+  coincident([line1.end, line2.start])
+  coincident([line2.end, line3.start])
+  coincident([line3.end, line4.start])
+  coincident([line4.end, line1.start])
+}
 
 // ----- Loft the two profiles into a frustum -----
-frustum = loft([baseProfile, topProfile])
+frustum = loft([base, top])
 
-// ----- Cross-shaped notch cut into the top face -----
-// A "+" shaped pocket, sized to straddle a bed leg, cut `notchDepth` down from the top.
-notchArmLen = topL / 2 + 10mm // extends past the top face edges so the cut is clean
+// ----- Socket notch cut into the top face -----
+// A socketW x socketL pocket, centered on the top face, leaving a continuous
+// `wallThickness` rim standing around it.
+notch = sketch(on = topPlane) {
+  line1 = line(start = [-socketL / 2, -socketW / 2], end = [socketL / 2, -socketW / 2])
+  line2 = line(start = [socketL / 2, -socketW / 2], end = [socketL / 2, socketW / 2])
+  line3 = line(start = [socketL / 2, socketW / 2], end = [-socketL / 2, socketW / 2])
+  line4 = line(start = [-socketL / 2, socketW / 2], end = [-socketL / 2, -socketW / 2])
 
-notchSketch = startSketchOn(topPlane)
-  |> startProfile(at = [-notchW / 2, -notchArmLen])
-  |> line(endAbsolute = [notchW / 2, -notchArmLen])
-  |> line(endAbsolute = [notchW / 2, -notchW / 2])
-  |> line(endAbsolute = [notchArmLen, -notchW / 2])
-  |> line(endAbsolute = [notchArmLen, notchW / 2])
-  |> line(endAbsolute = [notchW / 2, notchW / 2])
-  |> line(endAbsolute = [notchW / 2, notchArmLen])
-  |> line(endAbsolute = [-notchW / 2, notchArmLen])
-  |> line(endAbsolute = [-notchW / 2, notchW / 2])
-  |> line(endAbsolute = [-notchArmLen, notchW / 2])
-  |> line(endAbsolute = [-notchArmLen, -notchW / 2])
-  |> line(endAbsolute = [-notchW / 2, -notchW / 2])
-  |> close()
+  coincident([line1.end, line2.start])
+  coincident([line2.end, line3.start])
+  coincident([line3.end, line4.start])
+  coincident([line4.end, line1.start])
+}
 
-notchCut = extrude(notchSketch, length = -notchDepth)
+notchCut = extrude(notch, length = -notchDepth)
 
-// ----- Final solid: frustum minus the cross notch -----
+// ----- Final solid: frustum minus the socket -----
 riser = subtract([frustum], tools = [notchCut])
