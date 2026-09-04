@@ -5,10 +5,12 @@ baseW = 200mm   // base width (short axis)
 baseL = 400mm   // base length (elongated axis)
 socketW = 90mm  // socket opening width (short axis) - must fit the 9cm bed leg
 socketL = 180mm // socket opening length (elongated axis) - must fit the 18cm bed leg
-height = 150mm  // riser height
 
 notchDepth = 20mm     // how deep the socket cuts down from the top face
 wallThickness = 15mm  // thickness of the solid rim standing around the socket
+
+socketFloorHeight = 220mm // ground to the bottom (floor) of the socket pocket - exact requirement
+height = socketFloorHeight + notchDepth // riser height, derived so the socket floor lands at socketFloorHeight
 
 skirtOut = 5mm    // how far the skirt sticks out past the base footprint
 skirtHeight = 5mm // height (tallness) of the skirt flange
