@@ -10,39 +10,20 @@ height = 150mm  // riser height
 notchDepth = 20mm     // how deep the socket cuts down from the top face
 wallThickness = 15mm  // thickness of the solid rim standing around the socket
 
-flareOut = 5mm    // how far the bottom flare sticks out past the base footprint
-flareHeight = 5mm // height of the straight flared foot before the taper begins
+skirtOut = 5mm    // how far the skirt sticks out past the base footprint
+skirtHeight = 5mm // height (tallness) of the skirt flange
 
 // Top face is sized to the socket plus the wall on all sides, so the socket
 // opening itself always stays exactly socketW x socketL.
 topW = socketW + 2 * wallThickness // top width (short axis)
 topL = socketL + 2 * wallThickness // top length (elongated axis)
 
-// ----- Flare-foot profile (on XY, at ground level, centered at origin) -----
-// Sticks out `flareOut` past the base footprint on all sides - a flared foot
-// at ground level that resists lateral movement.
-flareFoot = sketch(on = XY) {
-  line1 = line(start = [-baseL / 2 - flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, -baseW / 2 - flareOut])
-  line2 = line(start = [baseL / 2 + flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, baseW / 2 + flareOut])
-  line3 = line(start = [baseL / 2 + flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, baseW / 2 + flareOut])
-  line4 = line(start = [-baseL / 2 - flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, -baseW / 2 - flareOut])
-
-  coincident([line1.end, line2.start])
-  coincident([line2.end, line3.start])
-  coincident([line3.end, line4.start])
-  coincident([line4.end, line1.start])
-}
-
-// ----- Flare-top profile (on a plane at `flareHeight`, centered at origin) -----
-// Same footprint as `flareFoot`, so flareFoot -> flareTop is a straight vertical
-// wall; the taper up to `top` begins above this plane.
-flareTopPlane = offsetPlane(XY, offset = flareHeight)
-
-flareTop = sketch(on = flareTopPlane) {
-  line1 = line(start = [-baseL / 2 - flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, -baseW / 2 - flareOut])
-  line2 = line(start = [baseL / 2 + flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, baseW / 2 + flareOut])
-  line3 = line(start = [baseL / 2 + flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, baseW / 2 + flareOut])
-  line4 = line(start = [-baseL / 2 - flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, -baseW / 2 - flareOut])
+// ----- Base profile (on XY, at ground level, centered at origin) -----
+base = sketch(on = XY) {
+  line1 = line(start = [-baseL / 2, -baseW / 2], end = [baseL / 2, -baseW / 2])
+  line2 = line(start = [baseL / 2, -baseW / 2], end = [baseL / 2, baseW / 2])
+  line3 = line(start = [baseL / 2, baseW / 2], end = [-baseL / 2, baseW / 2])
+  line4 = line(start = [-baseL / 2, baseW / 2], end = [-baseL / 2, -baseW / 2])
 
   coincident([line1.end, line2.start])
   coincident([line2.end, line3.start])
@@ -65,10 +46,29 @@ top = sketch(on = topPlane) {
   coincident([line4.end, line1.start])
 }
 
-// ----- Loft the three profiles into a frustum with a flared foot -----
-// flareFoot -> flareTop is a straight vertical wall (the flared foot);
-// flareTop -> top is the tapered slope up to the socket rim.
-frustum = loft([flareFoot, flareTop, top])
+// ----- Loft the base and top profiles into a frustum -----
+frustum = loft([base, top])
+
+// ----- Skirt around the bottom edge -----
+// A thin flat flange sticking out `skirtOut` past the base footprint, `skirtHeight`
+// tall, wrapping around the outside of the base like a small brim.
+skirtOuter = sketch(on = XY) {
+  line1 = line(start = [-baseL / 2 - skirtOut, -baseW / 2 - skirtOut], end = [baseL / 2 + skirtOut, -baseW / 2 - skirtOut])
+  line2 = line(start = [baseL / 2 + skirtOut, -baseW / 2 - skirtOut], end = [baseL / 2 + skirtOut, baseW / 2 + skirtOut])
+  line3 = line(start = [baseL / 2 + skirtOut, baseW / 2 + skirtOut], end = [-baseL / 2 - skirtOut, baseW / 2 + skirtOut])
+  line4 = line(start = [-baseL / 2 - skirtOut, baseW / 2 + skirtOut], end = [-baseL / 2 - skirtOut, -baseW / 2 - skirtOut])
+
+  coincident([line1.end, line2.start])
+  coincident([line2.end, line3.start])
+  coincident([line3.end, line4.start])
+  coincident([line4.end, line1.start])
+}
+
+skirtSolid = extrude(skirtOuter, length = skirtHeight)
+
+// Cut the base footprint out of the skirt block, leaving just the protruding ring.
+baseCut = extrude(base, length = skirtHeight)
+skirt = subtract([skirtSolid], tools = [baseCut])
 
 // ----- Socket notch cut into the top face -----
 // A socketW x socketL pocket, centered on the top face, leaving a continuous
@@ -87,5 +87,6 @@ notch = sketch(on = topPlane) {
 
 notchCut = extrude(notch, length = -notchDepth)
 
-// ----- Final solid: frustum minus the socket -----
-riser = subtract([frustum], tools = [notchCut])
+// ----- Final solid: frustum minus the socket, plus the skirt -----
+riserBody = subtract([frustum], tools = [notchCut])
+riser = union([riserBody, skirt])
