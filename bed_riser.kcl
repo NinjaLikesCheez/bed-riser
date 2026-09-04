@@ -10,17 +10,39 @@ height = 150mm  // riser height
 notchDepth = 20mm     // how deep the socket cuts down from the top face
 wallThickness = 15mm  // thickness of the solid rim standing around the socket
 
+flareOut = 5mm    // how far the bottom flare sticks out past the base footprint
+flareHeight = 5mm // height of the straight flared foot before the taper begins
+
 // Top face is sized to the socket plus the wall on all sides, so the socket
 // opening itself always stays exactly socketW x socketL.
 topW = socketW + 2 * wallThickness // top width (short axis)
 topL = socketL + 2 * wallThickness // top length (elongated axis)
 
-// ----- Base profile (on XY, centered at origin) -----
-base = sketch(on = XY) {
-  line1 = line(start = [-baseL / 2, -baseW / 2], end = [baseL / 2, -baseW / 2])
-  line2 = line(start = [baseL / 2, -baseW / 2], end = [baseL / 2, baseW / 2])
-  line3 = line(start = [baseL / 2, baseW / 2], end = [-baseL / 2, baseW / 2])
-  line4 = line(start = [-baseL / 2, baseW / 2], end = [-baseL / 2, -baseW / 2])
+// ----- Flare-foot profile (on XY, at ground level, centered at origin) -----
+// Sticks out `flareOut` past the base footprint on all sides - a flared foot
+// at ground level that resists lateral movement.
+flareFoot = sketch(on = XY) {
+  line1 = line(start = [-baseL / 2 - flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, -baseW / 2 - flareOut])
+  line2 = line(start = [baseL / 2 + flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, baseW / 2 + flareOut])
+  line3 = line(start = [baseL / 2 + flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, baseW / 2 + flareOut])
+  line4 = line(start = [-baseL / 2 - flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, -baseW / 2 - flareOut])
+
+  coincident([line1.end, line2.start])
+  coincident([line2.end, line3.start])
+  coincident([line3.end, line4.start])
+  coincident([line4.end, line1.start])
+}
+
+// ----- Flare-top profile (on a plane at `flareHeight`, centered at origin) -----
+// Same footprint as `flareFoot`, so flareFoot -> flareTop is a straight vertical
+// wall; the taper up to `top` begins above this plane.
+flareTopPlane = offsetPlane(XY, offset = flareHeight)
+
+flareTop = sketch(on = flareTopPlane) {
+  line1 = line(start = [-baseL / 2 - flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, -baseW / 2 - flareOut])
+  line2 = line(start = [baseL / 2 + flareOut, -baseW / 2 - flareOut], end = [baseL / 2 + flareOut, baseW / 2 + flareOut])
+  line3 = line(start = [baseL / 2 + flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, baseW / 2 + flareOut])
+  line4 = line(start = [-baseL / 2 - flareOut, baseW / 2 + flareOut], end = [-baseL / 2 - flareOut, -baseW / 2 - flareOut])
 
   coincident([line1.end, line2.start])
   coincident([line2.end, line3.start])
@@ -43,8 +65,10 @@ top = sketch(on = topPlane) {
   coincident([line4.end, line1.start])
 }
 
-// ----- Loft the two profiles into a frustum -----
-frustum = loft([base, top])
+// ----- Loft the three profiles into a frustum with a flared foot -----
+// flareFoot -> flareTop is a straight vertical wall (the flared foot);
+// flareTop -> top is the tapered slope up to the socket rim.
+frustum = loft([flareFoot, flareTop, top])
 
 // ----- Socket notch cut into the top face -----
 // A socketW x socketL pocket, centered on the top face, leaving a continuous
